@@ -7,60 +7,74 @@ public class CountdownTimer : MonoBehaviour
     public float startTime = 60f;
 
     [Header("UI")]
-    public TMP_Text timerText;          // Tekst pokazujący czas
-    public TMP_Text rotationText;       // Tekst pokazujący obrót w stopniach
+    public TMP_Text timerText;
+    public TMP_Text rotationText;
+    public TMP_Text highScoreText;
+    public GameObject endScreen;        // Twój End Screen w UI
 
     [Header("Obiekt obracający się")]
-    public Transform rotatingObject;    // Obiekt, którego obrót śledzimy
-    public float degreesPerRotation = 360f; // 1 pełny obrót = 360 stopni
+    public Transform rotatingObject;
+    public float degreesPerRotation = 360f;
 
     [Header("Reset braku ruchu")]
-    public float idleTimeToReset = 7f;  // czas bez ruchu po którym reset
-    public float minRotationToAvoidReset = 180f; // minimalny obrót, by nie zresetować
+    public float idleTimeToReset = 7f;
+    public float minRotationToAvoidReset = 180f;
+
+    [Header("Obiekt gracza do high score")]
+    public Transform player;
 
     private float currentTime;
     private bool timerActive = true;
 
-    
     private float previousRotation;
     private float totalRotation;
-    private float accumulatedRotation; 
-    private float rotationSinceLastCheck; 
+    private float accumulatedRotation;
+    private float rotationSinceLastCheck;
     private float timeSinceLastMovement;
+
+    private float highScore = 0f;
+    private float startPlayerY = 0f;
 
     void Start()
     {
         currentTime = startTime;
         UpdateTimerText();
         UpdateRotationText(0f);
-        Time.timeScale = 1f;
+
+        if (player != null)
+            startPlayerY = player.position.y;
+
+        highScore = 0f;
+        UpdateHighScoreText();
 
         if (rotatingObject == null)
             rotatingObject = transform;
 
         previousRotation = rotatingObject.eulerAngles.z;
+
+        // Ukryj end screen na start
+        if (endScreen != null)
+            endScreen.SetActive(false);
     }
 
     void Update()
     {
-        if (timerActive && Time.timeScale > 0)
+        if (timerActive)
         {
-            
             currentTime -= Time.deltaTime;
             if (currentTime <= 0)
             {
                 currentTime = 0;
                 timerActive = false;
-                Time.timeScale = 0f;
+                ShowEndScreen(); // zamiast Time.timeScale = 0
             }
 
             UpdateTimerText();
         }
 
         TrackRotation();
-
-      
         CheckIdleReset();
+        UpdateHighScore();
     }
 
     private void TrackRotation()
@@ -76,13 +90,11 @@ public class CountdownTimer : MonoBehaviour
             rotationSinceLastCheck += Mathf.Abs(deltaRotation);
             timeSinceLastMovement = 0f;
 
-           
             if (accumulatedRotation >= degreesPerRotation)
             {
                 int fullRotations = Mathf.FloorToInt(accumulatedRotation / degreesPerRotation);
                 accumulatedRotation -= fullRotations * degreesPerRotation;
                 AddTime(fullRotations);
-                Debug.Log($"Dodano {fullRotations} sekund za {fullRotations} pełny obrót!");
             }
         }
         else
@@ -99,7 +111,6 @@ public class CountdownTimer : MonoBehaviour
         {
             if (rotationSinceLastCheck < minRotationToAvoidReset)
             {
-                Debug.Log($"Reset liczby obrotów — brak ruchu przez {idleTimeToReset} s.");
                 totalRotation = 0f;
                 accumulatedRotation = 0f;
                 UpdateRotationText(totalRotation);
@@ -114,16 +125,13 @@ public class CountdownTimer : MonoBehaviour
     {
         if (collision.CompareTag("Stop"))
         {
-            Debug.Log("Dotknięto obiektu z tagiem STOP ");
             timerActive = false;
+            ShowEndScreen(); // end screen też przy kolizji ze śmiercią
         }
         else if (collision.CompareTag("Start"))
         {
             if (currentTime > 0)
-            {
-                Debug.Log("Dotknięto obiektu z tagiem START ");
                 timerActive = true;
-            }
         }
     }
 
@@ -143,7 +151,32 @@ public class CountdownTimer : MonoBehaviour
     {
         if (rotationText != null)
         {
-            rotationText.text = $"Obrót: {degrees:F1}°";
+            int roundedDegrees = Mathf.RoundToInt(degrees);
+            rotationText.text = $"{roundedDegrees}°"; // pełne stopnie z symbolem °
         }
+    }
+
+    private void UpdateHighScore()
+    {
+        if (player == null) return;
+
+        float relativeY = player.position.y - startPlayerY;
+        if (relativeY > highScore && relativeY > 0f)
+        {
+            highScore = relativeY;
+            UpdateHighScoreText();
+        }
+    }
+
+    private void UpdateHighScoreText()
+    {
+        if (highScoreText != null)
+            highScoreText.text = Mathf.FloorToInt(highScore).ToString(); // tylko liczba
+    }
+
+    private void ShowEndScreen()
+    {
+        if (endScreen != null)
+            endScreen.SetActive(true);
     }
 }
